@@ -427,7 +427,7 @@ Baser.get = function(data,def=null){
 
 
 
-Baser.delete = function(data,skip=false){
+Baser.del = function(data,skip=false){
   let keys = data.split(".").filter(e=>e.trim()!="");
   data = keys.join(".")
   let oldValue = Baser.get(data)
