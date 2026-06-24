@@ -570,55 +570,106 @@ Baser.when = function(Path,Ons={}){
 
 
 
-
-const Elementer = {}
-Elementer.when = function(selector, process, order=0, type="on"){
-  if(Elementer.when.observer==null){
-    Elementer.when.triggers = []
-    
+const Elementer = {};
+Elementer.render = function(html){
+    var mime = html.indexOf("xmlns=") == -1 ? "text/html" : "image/svg+xml";   
+    var parsed= Elementer.render.parser.parseFromString(html, mime);
+    return mime=="text/html" ? parsed.body.firstChild : parsed.firstChild;
+}
+Elementer.render.parser = new DOMParser();
+Elementer.when = function(selector, process, order = 0, type = "on") {
+  if (!Elementer.when.observer) {
+    Elementer.when.triggers = [];
     Elementer.when.check = function(nodes) {
       for (const node of nodes) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          for (const trigger of Elementer.when.triggers) {
-            let selector = trigger.selector;
-            if (node.matches(selector)) trigger.process.apply(node, [node]);
-            if (node.querySelectorAll(selector).length > 0) {
-              for (const el of node.querySelectorAll(selector)) {
-                trigger.process.apply(el, [el]);
-                if(trigger.type==='once'){
-                  Elementer.when.triggers.splice(Elementer.when.triggers.indexOf(trigger), 1);
-                }
-              }
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        for (const trigger of [...Elementer.when.triggers]) {
+          if (node.matches(trigger.selector)) {
+            trigger.process.call(node, node);
+            if (trigger.type === "once") {
+              Elementer.when.triggers.splice(Elementer.when.triggers.indexOf(trigger),1);
+            }
+          }
+          for (const el of node.querySelectorAll(trigger.selector)) {
+            trigger.process.call(el, el);
+            if (trigger.type === "once") {
+              Elementer.when.triggers.splice(Elementer.when.triggers.indexOf(trigger),1);
             }
           }
         }
       }
-    }
-
+    };
 
     Elementer.when.observer = new MutationObserver((mutations) => {
-      mutations = mutations.sort((a, b) => {
-        return b.type.localeCompare(a.type)
-      })
-      for (const m of mutations) {
-        if (m.type == "childList") {
-          let nodes = m.addedNodes;
-          Elementer.when.check(nodes);
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          Elementer.when.check(mutation.addedNodes);
         }
       }
     });
+
     Elementer.when.observer.observe(document.documentElement, {
       childList: true,
       subtree: true
     });
-    if(document.readyState=="interactive"){
-      Elementer.when.check([document.documentElement]);
-    }else{
-      document.addEventListener("DOMContentLoaded",function(){ Elementer.when.check([document.documentElement]); })
-    }
 
+    const init = () => Elementer.when.check([document.documentElement]);
+
+    if ( document.readyState === "interactive" || document.readyState === "complete" ) {
+      init();
+    } else {
+      document.addEventListener("DOMContentLoaded", init);
+    }
   }
+
   Elementer.when.triggers.push({
+    selector,
+    process,
+    order,
+    type
+  });
+};
+
+
+Elementer.then = function(selector, process, order = 0, type = "on") {
+  if (!Elementer.then.observer) {
+    Elementer.then.triggers = [];
+    Elementer.then.check = function(nodes) {
+      for (const node of nodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        for (const trigger of [...Elementer.then.triggers]) {
+          if (node.matches(trigger.selector)) {
+            trigger.process.call(node, node);
+            if (trigger.type === "once") {
+              Elementer.then.triggers.splice(Elementer.then.triggers.indexOf(trigger),1);
+            }
+          }
+
+          for (const el of node.querySelectorAll(trigger.selector)) {
+            trigger.process.call(el, el);
+            if (trigger.type === "once") {
+              Elementer.then.triggers.splice(Elementer.then.triggers.indexOf(trigger),1);
+            }
+          }
+        }
+      }
+    };
+
+    Elementer.then.observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          Elementer.then.check(mutation.removedNodes);
+        }
+      }
+    });
+
+    Elementer.then.observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  Elementer.then.triggers.push({
     selector,
     process,
     order,
